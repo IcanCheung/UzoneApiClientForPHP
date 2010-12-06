@@ -28,11 +28,15 @@ return array(
     // 乐园分配的secret,由乐园指定
     'secret'             => '123456',
     // 乐园分配的rsa private.key,由乐园指定
-    'privateKey'         => file_get_contents(dirname(__FILE__) . '/private.key'),
+    'privateKey'         => file_get_contents(dirname(__FILE__) . '/../../../ucsns/api/keys/private.key'),
     // 乐园的restserver地址,由乐园指定
     'restServer'         => 'http://api.u.uc.cn/restserver.php',
     // 乐园的单点登录地址,由乐园指定
     'ssoServer'          => 'http://u.uc.cn/index.php?r=sso/auth',
+    // 乐园币的配置
+    'lyb' => array(
+        'withdrawReason' => '',
+    ),
     // 接口支持的方法的列表
     'methodList' => array(),
 );

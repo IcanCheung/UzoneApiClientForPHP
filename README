@@ -1,0 +1,12 @@
+Hi, 欢迎使用UC乐园Rest接口 php版本的客户端。
+
+UC乐园Rest接口是对UC新推出的UC乐园的做的Http接口，可以实现查询用户基本信息、好友信息、发布说说、添加信息等等基本功能。
+可以用ucweb浏览器打开 u.uc.cn 进入uc乐园，试用里面上线的应用。
+
+使用例子见UzoneApiClientForPHP/examples/hello.php，里面有详细的注释。
+
+使用上遇到什么问题，请通过email与我取得联系 dengjiuhong@gmail.com
+Btw, 现在UC乐园接口的接入还没有对外开放，有应用需要接入UC乐园的，也可以与我联系。
+
+good luck!
+
