@@ -24,7 +24,7 @@ $UzoneRestApi = new UzoneRestApi($uzone_token);
 if (!$UzoneRestApi->checkIsAuth()){
     // 发现不是从乐园进入的用户，跳转到乐园单点登录接口，由乐园验证用户的身份
     // 当前页面的Url, 登录成功后，自动跳转回这个url, 并且在后面带uzone_token
-    $backUrl      = 'http://localhost/sdk/UzoneApiClientForPHP/examples/hello.php';
+    $backUrl      = 'http://localhost/sdk/UzoneApiClientForPHP/examples/hello.php?m=hello&do=aaa&msg=中文&li=xxxx&gi=xxx&wi=xxx';
     $UzoneRestApi->redirect2SsoServer($backUrl);
 }
 // TODO 把uzone_token保存至本地
