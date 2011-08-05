@@ -39,4 +39,6 @@ return array(
     ),
     // 接口支持的方法的列表
     'methodList' => array(),
+    //请求链接有效时间，时间单位：s
+    'effectiveTime'		=> 1800,
 );
