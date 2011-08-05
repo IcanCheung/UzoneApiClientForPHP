@@ -81,15 +81,15 @@ class UzoneRestApi
      * 
      * @param $time    int  - utc时间戳
      * @param $sig    string  - 需要校验的签名
-     * @param $param    array  - 需要校验的参数，没有默认使用$_GET
      * @return bool           - 如果通过校验，返回true, 不通过则返回false;
      */
-    public function checkIsEffective( $time, $sig, $param = array() )
+    public function checkIsEffective( $time, $sig )
     {
         if (! is_numeric( $time ) || $time <= 0)
         {
             return false;
         }
+        $param = array('time' => $time, 'uzone_token' => $this->uzone_token);
         //检查签名有效性
         if (! $this->_verifySig( $sig, $param ))
         {
@@ -118,27 +118,16 @@ class UzoneRestApi
         }
         $sig = isset( $param['sig'] ) ? $param['sig'] : $sig;
         
-        if (strlen( $sig ) != 32)
+        if (empty($sig))
         {
             return false;
         }
         
         unset( $param['sig'] );
-        ksort( $param );
-        // 变成字符串  xx=bbdd=xx
-        $str = array();
-        foreach ( $param as $key => $v )
-        {
-            $str[] = $key . '=' . $v;
-        }
-        $str = implode( '', $str );
-        // 去掉&
-        $str = str_replace( '&', '', $str );
-        // 后面加 secretKey
-        $str = $str . $this->secret;
-        // md5
-        $str = md5( $str );
-        if ($str == $sig)
+        
+        $appSig = $this->_genSignature($param);
+        
+        if ($appSig == $sig)
         {
             return true;
         }
@@ -292,7 +281,7 @@ class UzoneRestApi
      * @param String $param  - 请求的http参数
      * @return String        - 按照规则生成的sig
      */
-    private function _genSignature(&$param = array())
+    private function _genSignature($param = array())
     {
         ksort($param);
         $str = array();
