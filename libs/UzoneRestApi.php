@@ -58,7 +58,8 @@ class UzoneRestApi
         $this -> connectTimeOut = $config['connectTimeOut'];//单位秒
         $this -> streamTimeOut = $config['streamTimeOut'];//单位毫秒
         $this->config     = $config;
-        $this->init();
+        $this->effectiveTime = $config['effectiveTime'];
+        $this->_init();
     }
     /**
      * @desc 检查是否为授权的用户
@@ -74,6 +75,74 @@ class UzoneRestApi
     public function getAuthUid()
     {
         return $this->uid;
+    }
+    /**
+     * @desc 该接口可以判断请求的签名，及时间戳是否有效。自2011-08-05开始，乐园支持时间戳及签名验证。
+     * 
+     * @param $time    int  - utc时间戳
+     * @param $sig    string  - 需要校验的签名
+     * @param $param    array  - 需要校验的参数，没有默认使用$_GET
+     * @return bool           - 如果通过校验，返回true, 不通过则返回false;
+     */
+    public function checkIsEffective( $time, $sig, $param = array() )
+    {
+        if (! is_numeric( $time ) || $time <= 0)
+        {
+            return false;
+        }
+        //检查签名有效性
+        if (! $this->_verifySig( $sig, $param ))
+        {
+            return false;
+        }
+        //检查时间戳有效性，超时则无效
+        if (time() - $time >= $this->effectiveTime)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @desc 统一校验签名
+     *
+     * @param $sig    string  - 需要校验的签名
+     * @param $param    array  - 需要校验的参数，没有默认使用$_GET
+     * @return bool           - 如果通过校验，返回true, 不通过则返回false;
+     */
+    private function _verifySig( $sig, $param = array() )
+    {
+        if (empty( $param ) || ! is_array( $param ))
+        {
+            $param = $_GET;
+        }
+        $sig = isset( $param['sig'] ) ? $param['sig'] : $sig;
+        
+        if (strlen( $sig ) != 32)
+        {
+            return false;
+        }
+        
+        unset( $param['sig'] );
+        ksort( $param );
+        // 变成字符串  xx=bbdd=xx
+        $str = array();
+        foreach ( $param as $key => $v )
+        {
+            $str[] = $key . '=' . $v;
+        }
+        $str = implode( '', $str );
+        // 去掉&
+        $str = str_replace( '&', '', $str );
+        // 后面加 secretKey
+        $str = $str . $this->secret;
+        // md5
+        $str = md5( $str );
+        if ($str == $sig)
+        {
+            return true;
+        }
+        return false;
     }
     /**
      * @desc 检查是否成功执行了
@@ -104,7 +173,7 @@ class UzoneRestApi
         if (!in_array($method, $this->methodList)){
             #throw new Exception ('unknow method ' . $method);
         }
-        return $this->httpRequest($param, $method, $postParam);
+        return $this->_httpRequest($param, $method, $postParam);
     }
     /**
      * @desc 跳转到单点登录接口
@@ -119,11 +188,11 @@ class UzoneRestApi
                 'backUrl' => $backUrl,
                 'v'       => $this->v
             );
-            $sig          = $this->signature($param);
+            $sig          = $this->_genSignature($param);
             $param['sig'] = $sig;
             $prefix       = strpos($this->ssoServer,'?') !== false ? '&' : '?';
             $url          = $this->ssoServer . $prefix . http_build_query($param);
-            $this->logger("redirect2SsoServer\t" . $url);
+            $this->_logger("redirect2SsoServer\t" . $url);
             header('status: 302');
             header('location: ' . $url);
         }
@@ -131,9 +200,9 @@ class UzoneRestApi
     /**
      * @desc 初始化
      */
-    private function init()
+    private function _init()
     {
-        $this->parseUzoneToken();
+        $this->_parseUzoneToken();
     }
     /**
      * @desc  发送http请求
@@ -141,7 +210,7 @@ class UzoneRestApi
      * @param String $method - 请求的方法
      * @return 返回接口的数据
      */
-    private function httpRequest($param, $method, $postParam = array())
+    private function _httpRequest($param, $method, $postParam = array())
     {
     	if($param){
 	    	foreach($param as $k=>$v){
@@ -158,26 +227,26 @@ class UzoneRestApi
 	        }
     	}
         $param['method'] = $method;
-        $url             = $this->buildRequestUrl($param,$postParam);
-        $this->logger("httpRequest\t" . $url);
+        $url             = $this->_buildRequestUrl($param,$postParam);
+        $this->_logger("httpRequest\t" . $url);
         $this->isCallSuccess = false;
         $this->callErrorMsg  = '';
         $res = $this->urlOpen($url,$postParam);
-        return $this->parseResponse($res);
+        return $this->_parseResponse($res);
     }
     /**
      * @desc 解析uzone_token
      */
-    private function parseUzoneToken()
+    private function _parseUzoneToken()
     {
         if (empty($this->uzone_token)) return false;
-        $this->logger("parseUzoneToken\tstart\t" . $this->uzone_token);
+        $this->_logger("parseUzoneToken\tstart\t" . $this->uzone_token);
         $token        = base64_decode($this->uzone_token);
         try {
             openssl_private_decrypt($token, $this->uid, $this->privateKey);
-            $this->logger("parseUzoneToken\tfinish\t" . $this->uid);
+            $this->_logger("parseUzoneToken\tfinish\t" . $this->uid);
         } catch(exception $e){
-            $this->logger("parseUzoneToken\t" . $this->uzone_token . "\t" . $e->getMessage(), 'warn');
+            $this->_logger("parseUzoneToken\t" . $this->uzone_token . "\t" . $e->getMessage(), 'warn');
             return false;
         }
         return true;
@@ -188,13 +257,13 @@ class UzoneRestApi
      * @param String $response  - 返回的字符数据
      * @return array   - json decode出来的数组
      */
-    private function parseResponse($response)
+    private function _parseResponse($response)
     {
 		$res =  json_decode($response, true);
-		$this->logger("parseResponse\t" . $response . "\t".$res['msg']);
+		$this->_logger("parseResponse\t" . $response . "\t".$res['msg']);
         if (!$res || $res['status'] != 'ok'){
             // 请求接口失败, 记录log
-            $this->logger("parseResponse\t" . $response . "\t" . $res['msg'], "error");
+            $this->_logger("parseResponse\t" . $response . "\t" . $res['msg'], "error");
             $this->callErrorMsg = $response;
         } else {
             $this->isCallSuccess = true;
@@ -206,12 +275,12 @@ class UzoneRestApi
      * @param Array $param  - 请求的参数
      * @return String       - 请求的url
      */
-    private function buildRequestUrl($param,$postParam = array())
+    private function _buildRequestUrl($param,$postParam = array())
     {
         if (!isset($param['appKey'])) $param['appKey'] = $this->appKey;
         if (!isset($param['v'])) $param['v']           = $this->v;
         if (!isset($param['uzone_token']) && !empty($this->uzone_token)) $param['uzone_token'] = $this->uzone_token;
-        $sig          = $this->signature(array_merge($param,$postParam));
+        $sig          = $this->_genSignature(array_merge($param,$postParam));
         $param['sig'] = $sig;
         $prefix       = strpos($this->restServer,'?') !== false ? '&' : '?';
         $url          = $this->restServer . $prefix . http_build_query($param);
@@ -223,7 +292,7 @@ class UzoneRestApi
      * @param String $param  - 请求的http参数
      * @return String        - 按照规则生成的sig
      */
-    private function signature(&$param = array())
+    private function _genSignature(&$param = array())
     {
         ksort($param);
         $str = array();
@@ -231,7 +300,7 @@ class UzoneRestApi
             $str[] = $key . '=' . $v;
         }
         
-        $str = implode('&', $str);
+        $str = implode('', $str);
         // 去掉&
         $str = str_replace('&', '', $str);
         // 后面加 screntKey
@@ -244,7 +313,7 @@ class UzoneRestApi
      * @param string $msg
      * @param string $level
      */
-    private function logger($msg, $level = 'debug')
+    private function _logger($msg, $level = 'debug')
     {
         if (!$this->config['debug'] && $level == 'debug') return false;
         if (!$this->config['time'] && $level == 'time') return false;
@@ -268,7 +337,7 @@ class UzoneRestApi
 		}
 		$open_time_end = microtime(1);
 		$open_time = round($open_time_end - $open_time_start, 3);
-		$this->logger(sprintf( "`open_time=%s`api=%s`", $open_time, $url),'time');
+		$this->_logger(sprintf( "`open_time=%s`api=%s`", $open_time, $url),'time');
          
 		$isM = preg_match ( '/{.*}/', $result, $matchs );
 		return ($isM) ? $matchs [0] : $result;
@@ -372,6 +441,12 @@ class UzoneRestApi
 	 }
     private $config;
     private $isCallSuccess = false;
+    
+    /**
+     * @desc 请求链接有效时间，时间单位：s
+     * @var  int
+     */
+    private  $effectiveTime = 1800;
     /**
      * @desc 目前乐园提供的可用的接口
      * @var  array
